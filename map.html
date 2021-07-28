@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Strava activities</title>
+    
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/> -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.5.1/gpx.min.js"></script>
+    <script type="text/javascript" src="https://rawgit.com/jieter/Leaflet.encoded/master/Polyline.encoded.js"></script>
+    <script type="text/javascript" src="activities.js"></script>
+    <script type="text/javascript" src="photos.js"></script>
+</head>
+<body>
+
+<div id="map" style="position: absolute; top: 0; left: 0; height: 100%; width: 100%;"></div>
+<script>
+    var map = L.map('map', {
+        preferCanvas: true
+    });
+
+    var tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
+    // San Francisco
+    map.setView(new L.LatLng(37.7749, -122.4194), 13);
+
+    // Kyiv
+    // map.setView(new L.LatLng(50.4501, 30.5234), 13);
+
+    // Lviv
+    // map.setView(new L.LatLng(49.8397, 24.0297), 13);
+
+    // Amsterdam
+    // map.setView(new L.LatLng(52.370216, 4.895168), 13);
+
+    // New York City
+    // map.setView(new L.LatLng(40.730610, -73.935242), 13);
+
+    tileLayer.addTo(map);
+
+    function decode(encoded) {
+        var index = 0,
+            latitude = 0,
+            longitude = 0,
+            coordinates = [],
+            shift = 0,
+            result = 0,
+            byte = null,
+            latitude_change,
+            longitude_change,
+            factor = Math.pow(10, 5);
+
+        while (index < encoded.length) {
+            byte = null;
+            shift = 0;
+            result = 0;
+
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+
+            latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+            shift = result = 0;
+
+            do {
+                byte = encoded.charCodeAt(index++) - 63;
+                result |= (byte & 0x1f) << shift;
+                shift += 5;
+            } while (byte >= 0x20);
+
+            longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+            latitude += latitude_change;
+            longitude += longitude_change;
+
+            coordinates.push([latitude / factor, longitude / factor]);
+        }
+
+        return coordinates;
+    };
+
+    polylines.forEach(function (polyline) {
+        var coordinates = decode(polyline);
+        var polyline = L.polyline(
+            coordinates,
+            {
+                color: 'blue',
+                weight: 1.5,
+                lineJoin: 'round'
+            }
+        ).addTo(map);
+    });
+
+    // photos.forEach(function (photo) {
+    //     // L.marker(photo).addTo(map);
+    //     // console.log(photo[0], photo[1])
+        
+    //     var circle = L.circle(photo, {
+    //         color: '#FF0000',
+    //         fillColor: '#FF0000',
+    //         fillOpacity: 1.0
+    //     }).addTo(map);
+    // });
+
+    // function onLocationFound(e) {
+    //     L.marker(e.latlng).addTo(map);
+    // }
+
+    // map.on('locationfound', onLocationFound);
+    // map.locate({
+    //     setView: true, 
+    //     watch: true,
+    //     maxZoom: 13
+    // });
+
+</script>
+</body>
+</html>
