@@ -1,4 +1,3 @@
-# import polyline
 import requests
 import json
 import os
@@ -6,6 +5,7 @@ import glob
 import ujson
 # from exif import Image
 import csv
+import math
 
 def get_activities(amount_per_page, access_token):
     url = "https://www.strava.com/api/v3/activities?access_token={}&per_page={}&page=1".format(access_token, amount_per_page)
@@ -20,44 +20,159 @@ def get_activity(id, access_token):
 
     return response.json()
 
-# --------------
+def load_activities():
+    access_token = ""
 
-# access_token = ""
+    with open('temp.json', 'w') as activities_file:
+        json.dump(get_activities(1, access_token), activities_file)
 
-# with open('temp.json', 'w') as activities_file:
-#     json.dump(get_activities(1, access_token), activities_file)
+    f = open('temp.json')
 
-# f = open('temp.json')
+    data = json.load(f)
+    
+    for element in data:
+        id = element["id"]
+        print(id)
 
-# data = json.load(f)
-  
-# for element in data:
-#     id = element["id"]
-#     print(id)
+        response = get_activity(id, access_token)
+        with open("activities/new/{}.json".format(id), "w") as json_file:
+            json.dump(response, json_file)
+    
+    f.close()
 
-#     response = get_activity(id, access_token)
-#     with open("activities/new/{}.json".format(id), "w") as json_file:
-#         json.dump(response, json_file)
-  
-# f.close()
+def create_file_activities():
+    # x - create file
+    # w - overwrite file
+    # a - append to file
+    activities_file = open("activities.js", "w")
 
-# --------------
+    activities_file.write("var polylines = [")
+    folder_path = 'activities'
+    for json_file in glob.glob(os.path.join(folder_path, '5624173480.json')):
+        with open(json_file, 'r') as source_file:
+            data = json.load(source_file)
+            polyline = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
+            activities_file.write("{},".format(polyline))
 
-# x - create file
-# w - overwrite file
-# a - append to file
-activities_file = open("activities.js", "w")
+    activities_file.write("];")
+    activities_file.close()
 
-activities_file.write("var polylines = [")
-folder_path = 'activities'
-for json_file in glob.glob(os.path.join(folder_path, '*.json')):
-    with open(json_file, 'r') as source_file:
+def distance(origin, destination):
+    lat1, lon1 = origin
+    lat2, lon2 = destination
+    radius = 6371 # km
+
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (math.sin(dlat / 2) * math.sin(dlat / 2) +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dlon / 2) * math.sin(dlon / 2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    d = radius * c
+
+    return d * 1000
+
+def decode(encoded):
+    index, lat, lng = 0, 0, 0
+    coordinates = []
+    changes = {'latitude': 0, 'longitude': 0}
+    factor = 100000.0
+
+    while index < len(encoded):
+        for unit in ['latitude', 'longitude']: 
+            shift, result = 0, 0
+
+            while True:
+                byte = ord(encoded[index]) - 63
+                index+=1
+                result |= (byte & 0x1f) << shift
+                shift += 5
+                if not byte >= 0x20:
+                    break
+
+            if (result & 1):
+                changes[unit] = ~(result >> 1)
+            else:
+                changes[unit] = (result >> 1)
+
+        lat += changes['latitude']
+        lng += changes['longitude']
+
+        coordinates.append((lng / factor, lat / factor))
+
+    return coordinates
+
+# Get coordinates from activities
+def coordinates():
+    activity_coordinates = []
+
+    folder_path = 'activities'
+    for json_file in glob.glob(os.path.join(folder_path, '5624173480.json')):
+        with open(json_file, 'r') as source_file:
+            data = json.load(source_file)
+            polyline_str = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
+
+            activity_coordinates = decode(polyline_str.replace('\\\\','\\'))
+
+    return activity_coordinates
+
+# Get ways and nodes from OpenStreetMap
+def ways_and_nodes():
+    with open("san_francisco.json", 'r') as source_file:
         data = json.load(source_file)
-        polyline = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
-        activities_file.write("{},".format(polyline))
 
-activities_file.write("];")
-activities_file.close()
+        nodes = {}
+        ways = {}
+
+        for element in data["elements"]:
+            if element["type"] == "way":
+                nodes_in_way = []
+                for node in element["nodes"]:
+                    nodes_in_way.append(node)
+
+                ways[element["id"]] = (nodes_in_way, element["tags"]["name"])
+            elif element["type"] == "node":
+                nodes[element["id"]] = (element["id"], element["lat"], element["lon"], 0)
+    
+    return (ways, nodes)
+
+(ways, nodes) = ways_and_nodes()
+
+# Detect if coordinate from activity is within 25 meters of node
+for coordinate in coordinates()[0:5]:
+    for way in ways:
+        for node in ways[way][0]:
+            dist = distance(coordinate, (nodes[node][1], nodes[node][2]))
+
+            if dist < float(25.0):
+                list_from_tuple = list(nodes[node])
+                list_from_tuple[3] = 1
+
+                nodes[node] = tuple(list_from_tuple)
+
+streets = {}
+for way in ways:
+    if ways[way][1] not in streets:
+        
+        street_nodes = []
+
+        for node in ways[way][0]:
+            street_nodes.append(nodes[node])
+
+        streets[ways[way][1]] = street_nodes
+    else:
+        arr = streets[ways[way][1]]
+
+        street_nodes = []
+
+        for node in ways[way][0]:
+            street_nodes.append(nodes[node])
+
+        arr += street_nodes
+        streets[ways[way][1]] = arr
+
+with open('streets.json', 'w') as f:
+    json.dump(streets, f)
 
 # --------------
 

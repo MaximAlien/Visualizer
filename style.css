@@ -1,0 +1,47 @@
+* {
+    box-sizing: border-box;
+}
+
+#map {
+    position: absolute;
+    z-index: 1;
+}
+
+#searchStreetsInput {
+    position: absolute;
+    width: 30%;
+    top: 10px;
+    left: 60px;
+    height: 30px;
+    font-size: 16px;
+    padding: 0;
+    border: 1px solid #ddd;
+    z-index: 2;
+}
+  
+#streetsListView {
+    overflow: auto;
+    position: absolute;
+    top: 40px;
+    left: 60px;
+    width: 30%;
+    height: 30%;
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    z-index: 2;
+}
+  
+#streetsListView li a {
+    border: 1px solid #ddd;
+    margin-top: -1px;
+    background-color: #f6f6f6;
+    text-decoration: none;
+    font-size: 18px;
+    color: black;
+    display: block
+}
+
+#streetsListView li a:hover:not(.header) {
+    background-color: #eee;
+}

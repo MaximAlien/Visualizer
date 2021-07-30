@@ -6,17 +6,43 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/> -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="style.css">
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.5.1/gpx.min.js"></script>
+    
     <script type="text/javascript" src="https://rawgit.com/jieter/Leaflet.encoded/master/Polyline.encoded.js"></script>
     <script type="text/javascript" src="activities.js"></script>
     <script type="text/javascript" src="photos.js"></script>
 </head>
 <body>
 
-<div id="map" style="position: absolute; top: 0; left: 0; height: 100%; width: 100%;"></div>
+<div id="map" class="map" style="position: absolute; top: 0; left: 0; height: 100%; width: 100%;"></div>
+<input id="searchStreetsInput" class="listView" type="text" onkeyup="searchByStreetName()" placeholder="Search for street names..." title="Type in a street name"></input>
+<ul id="streetsListView" class="listView"></ul>
+
 <script>
+    function searchByStreetName() {
+        var input, filter, ul, li, a, i, text;
+        input = document.getElementById("searchStreetsInput");
+        filter = input.value.toUpperCase();
+        ul = document.getElementById("streetsListView");
+        li = ul.getElementsByTagName("li");
+
+        for (i = 0; i < li.length; i++) {
+            a = li[i].getElementsByTagName("a")[0];
+            text = a.textContent || a.innerText;
+
+            if (text.toUpperCase().indexOf(filter) > -1) {
+                li[i].style.display = "";
+            } else {
+                li[i].style.display = "none";
+            }
+        }
+    }
+
     var map = L.map('map', {
         preferCanvas: true
     });
@@ -87,17 +113,60 @@
         return coordinates;
     };
 
-    polylines.forEach(function (polyline) {
-        var coordinates = decode(polyline);
-        var polyline = L.polyline(
-            coordinates,
-            {
-                color: 'blue',
-                weight: 1.5,
-                lineJoin: 'round'
+    // polylines.forEach(function (polyline) {
+    //     var coordinates = decode(polyline);
+    //     var polyline = L.polyline(
+    //         coordinates,
+    //         {
+    //             color: 'blue',
+    //             weight: 1.5,
+    //             lineJoin: 'round'
+    //         }
+    //     ).addTo(map);
+    // });
+
+    var obj;
+
+    var ul = document.getElementById('streetsListView');
+    ul.onclick = function(event) {
+
+        map.eachLayer(function(layer) {
+            if (!!layer.toGeoJSON) {
+                map.removeLayer(layer);
             }
-        ).addTo(map);
-    });
+        });
+
+        var target = event.target;
+        const t = obj[event.target.innerHTML]
+        for (i = 0; i < t.length; i++) {
+            const coordinate = [t[i][1], t[i][2]]
+
+            var circle = L.circle(coordinate, {
+                color: '#FF0000',
+                fillColor: '#FF0000',
+                fillOpacity: 1.0
+            }).addTo(map);
+        }
+    };
+
+    var request = new XMLHttpRequest();
+    request.open("GET", "http://localhost:8000/streets.json");
+    request.send();
+
+    request.onreadystatechange = (e) => {
+        obj = JSON.parse(request.responseText);
+
+        for (const [key, value] of Object.entries(obj)) {
+            var li = document.createElement('li');
+            
+            var a = document.createElement('a');
+            a.innerHTML = key
+
+            li.appendChild(a);
+
+            document.getElementById('streetsListView').appendChild(li);
+        }
+    }
 
     // photos.forEach(function (photo) {
     //     // L.marker(photo).addTo(map);
