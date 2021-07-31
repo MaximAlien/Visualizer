@@ -49,7 +49,7 @@ def create_file_activities():
 
     activities_file.write("var polylines = [")
     folder_path = 'activities'
-    for json_file in glob.glob(os.path.join(folder_path, '5624173480.json')):
+    for json_file in glob.glob(os.path.join(folder_path, '*.json')):
         with open(json_file, 'r') as source_file:
             data = json.load(source_file)
             polyline = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
@@ -108,12 +108,38 @@ def coordinates():
     activity_coordinates = []
 
     folder_path = 'activities'
-    for json_file in glob.glob(os.path.join(folder_path, '5624173480.json')):
-        with open(json_file, 'r') as source_file:
-            data = json.load(source_file)
-            polyline_str = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
+    with open('activities.js', 'w') as activities_file:
+        activities_file.write("var polylines = [")
 
-            activity_coordinates = decode(polyline_str.replace('\\\\','\\'))
+        for json_file in glob.glob(os.path.join(folder_path, '3836255196.json')):
+            with open(json_file, 'r') as source_file:
+                data = json.load(source_file)
+                id = data["id"]
+
+                if len(data["segment_efforts"]) > 1:
+                    city = data["segment_efforts"][0]["segment"]["city"]
+                    expected_city = "San Francisco"
+
+                    if city != expected_city:
+                        print("Skipping {}, as it's outside of {}.".format(city, expected_city))
+                        continue
+
+                polyline_str = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
+
+                current_activity_coordinates = decode(polyline_str.replace('\\\\','\\'))
+
+                coordinates_threshold = 10000
+
+                if len(current_activity_coordinates) > coordinates_threshold:
+                    print("Skipping {}, as it contains too many coordinates {}.".format(id, len(current_activity_coordinates)))
+                    continue
+
+                print("{} will be used for map matching.".format(id))
+                activity_coordinates.append(current_activity_coordinates)
+                activities_file.write("{},".format(ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)))
+
+        activities_file.write("];")
+        activities_file.close()
 
     return activity_coordinates
 
@@ -137,84 +163,90 @@ def ways_and_nodes():
     
     return (ways, nodes)
 
-(ways, nodes) = ways_and_nodes()
+def create_streets():
+    (ways, nodes) = ways_and_nodes()
 
-# Detect if coordinate from activity is within 25 meters of node
-start_time = time.time()
+    # Detect if coordinate from activity is within 25 meters of node
+    start_time = time.time()
 
-index = 0
-coordinates = coordinates()
+    activities = coordinates()
 
-print("Total number of coordinates in activity: {}".format(len(coordinates)))
+    print("Total number of activities, which were started in San Francisco: {}".format(len(activities)))
 
-for coordinate in coordinates:
-    print("Trying to match activity coordinate #{}: {}".format(index, coordinate))
-    index += 1
-    
+    for activity_coordinates in activities:
+        print("Activity contains {} coordinates.".format(len(activity_coordinates)))
+
+        index = 0
+        for coordinate in activity_coordinates:
+            print("Trying to match activity coordinate #{}: {}".format(index, coordinate))
+            index += 1
+            
+            for way in ways:
+                for node in ways[way][0]:
+                    dist = distance(coordinate, (nodes[node][1], nodes[node][2]))
+
+                    if dist < float(25.0):
+                        list_from_tuple = list(nodes[node])
+                        list_from_tuple[3] = 1
+
+                        nodes[node] = tuple(list_from_tuple)
+
+    streets = {}
     for way in ways:
-        for node in ways[way][0]:
-            dist = distance(coordinate, (nodes[node][1], nodes[node][2]))
+        if ways[way][1] not in streets:
+            
+            street_nodes = []
 
-            if dist < float(25.0):
-                list_from_tuple = list(nodes[node])
-                list_from_tuple[3] = 1
+            for node in ways[way][0]:
+                street_nodes.append(nodes[node])
 
-                nodes[node] = tuple(list_from_tuple)
+            street_info = {
+                "nodes": street_nodes,
+                "progress": 0.0
+            }
 
-streets = {}
-for way in ways:
-    if ways[way][1] not in streets:
+            streets[ways[way][1]] = street_info
+        else:
+            arr = streets[ways[way][1]]["nodes"]
+
+            street_nodes = []
+
+            for node in ways[way][0]:
+                street_nodes.append(nodes[node])
+
+            arr += street_nodes
+
+            street_info = {
+                "nodes": arr,
+                "progress": 0.0
+            }
+
+            streets[ways[way][1]] = street_info
+
+    for street in streets:
+        total_number_of_nodes = len(streets[street]["nodes"])
+        total_number_of_visited_nodes = 0
+        for nodes in streets[street]["nodes"]:
+            if nodes[3] == 1:
+                total_number_of_visited_nodes += 1
         
-        street_nodes = []
+        percentage_of_visited_nodes = float("{:.2f}".format(total_number_of_visited_nodes * 100 / total_number_of_nodes))
 
-        for node in ways[way][0]:
-            street_nodes.append(nodes[node])
+        print("Total number of nodes: {}, total number of visited nodes: {}.".format(total_number_of_nodes, total_number_of_visited_nodes))
 
-        street_info = {
-            "nodes": street_nodes,
-            "progress": 0.0
-        }
+        if percentage_of_visited_nodes != 0.0:
+            print("Visited {} percent of the {}".format(percentage_of_visited_nodes, street))
 
-        streets[ways[way][1]] = street_info
-    else:
-        arr = streets[ways[way][1]]["nodes"]
+        streets[street]["progress"] = percentage_of_visited_nodes
 
-        street_nodes = []
+    with open('streets.json', 'w') as f:
+        json.dump(streets, f)
 
-        for node in ways[way][0]:
-            street_nodes.append(nodes[node])
+    end_time = time.time()
+    time_difference = (end_time - start_time) / 60
+    print("It took {:.2f} minutes to map match coordinates.".format(time_difference))
 
-        arr += street_nodes
-
-        street_info = {
-            "nodes": arr,
-            "progress": 0.0
-        }
-
-        streets[ways[way][1]] = street_info
-
-for street in streets:
-    total_number_of_nodes = len(streets[street]["nodes"])
-    total_number_of_visited_nodes = 0
-    for nodes in streets[street]["nodes"]:
-        if nodes[3] == 1:
-            total_number_of_visited_nodes += 1
-    
-    percentage_of_visited_nodes = float("{:.2f}".format(total_number_of_visited_nodes * 100 / total_number_of_nodes))
-
-    print("Total number of nodes: {}, total number of visited nodes: {}.".format(total_number_of_nodes, total_number_of_visited_nodes))
-
-    if percentage_of_visited_nodes != 0.0:
-        print("Visited {} percent of the {}".format(percentage_of_visited_nodes, street))
-
-    streets[street]["progress"] = percentage_of_visited_nodes
-
-with open('streets.json', 'w') as f:
-    json.dump(streets, f)
-
-end_time = time.time()
-time_difference = (end_time - start_time) / 60
-print("It took {:.2f} minutes to map match coordinates.".format(time_difference))
+create_streets()
 
 # --------------
 
