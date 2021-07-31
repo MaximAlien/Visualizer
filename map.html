@@ -128,7 +128,7 @@
         ).addTo(map);
     });
 
-    var obj;
+    var streets_obj;
 
     var ul = document.getElementById('streetsListView');
     ul.onclick = function(event) {
@@ -136,8 +136,8 @@
         streetsGroup.clearLayers();
 
         const streetName = event.target.innerHTML
-        const nodes = obj[streetName]["nodes"]
-        const progress = obj[streetName]["progress"]
+        const nodes = streets_obj[streetName]["nodes"]
+        const progress = streets_obj[streetName]["progress"]
         for (i = 0; i < nodes.length; i++) {
             const coordinate = [nodes[i][1], nodes[i][2]]
 
@@ -160,14 +160,14 @@
         alert("Your progress on " + streetName + " is: " + progress + ".")
     };
 
-    var request = new XMLHttpRequest();
-    request.open("GET", "http://localhost:8000/streets.json");
-    request.send();
+    var streets_request = new XMLHttpRequest();
+    streets_request.open("GET", "http://localhost:8000/streets.json");
+    streets_request.send();
 
-    request.onreadystatechange = (e) => {
-        obj = JSON.parse(request.responseText);
+    streets_request.onreadystatechange = (e) => {
+        streets_obj = JSON.parse(streets_request.responseText);
 
-        for (const [key, value] of Object.entries(obj)) {
+        for (const [key, value] of Object.entries(streets_obj)) {
             var li = document.createElement('li');
             
             var a = document.createElement('a');
