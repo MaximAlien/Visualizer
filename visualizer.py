@@ -6,6 +6,7 @@ import ujson
 # from exif import Image
 import csv
 import math
+import time
 
 def get_activities(amount_per_page, access_token):
     url = "https://www.strava.com/api/v3/activities?access_token={}&per_page={}&page=1".format(access_token, amount_per_page)
@@ -139,7 +140,17 @@ def ways_and_nodes():
 (ways, nodes) = ways_and_nodes()
 
 # Detect if coordinate from activity is within 25 meters of node
-for coordinate in coordinates()[0:5]:
+start_time = time.time()
+
+index = 0
+coordinates = coordinates()
+
+print("Total number of coordinates in activity: {}".format(len(coordinates)))
+
+for coordinate in coordinates:
+    print("Trying to match activity coordinate #{}: {}".format(index, coordinate))
+    index += 1
+    
     for way in ways:
         for node in ways[way][0]:
             dist = distance(coordinate, (nodes[node][1], nodes[node][2]))
@@ -159,9 +170,14 @@ for way in ways:
         for node in ways[way][0]:
             street_nodes.append(nodes[node])
 
-        streets[ways[way][1]] = street_nodes
+        street_info = {
+            "nodes": street_nodes,
+            "progress": 0.0
+        }
+
+        streets[ways[way][1]] = street_info
     else:
-        arr = streets[ways[way][1]]
+        arr = streets[ways[way][1]]["nodes"]
 
         street_nodes = []
 
@@ -169,10 +185,36 @@ for way in ways:
             street_nodes.append(nodes[node])
 
         arr += street_nodes
-        streets[ways[way][1]] = arr
+
+        street_info = {
+            "nodes": arr,
+            "progress": 0.0
+        }
+
+        streets[ways[way][1]] = street_info
+
+for street in streets:
+    total_number_of_nodes = len(streets[street]["nodes"])
+    total_number_of_visited_nodes = 0
+    for nodes in streets[street]["nodes"]:
+        if nodes[3] == 1:
+            total_number_of_visited_nodes += 1
+    
+    percentage_of_visited_nodes = float("{:.2f}".format(total_number_of_visited_nodes * 100 / total_number_of_nodes))
+
+    print("Total number of nodes: {}, total number of visited nodes: {}.".format(total_number_of_nodes, total_number_of_visited_nodes))
+
+    if percentage_of_visited_nodes != 0.0:
+        print("Visited {} percent of the {}".format(percentage_of_visited_nodes, street))
+
+    streets[street]["progress"] = percentage_of_visited_nodes
 
 with open('streets.json', 'w') as f:
     json.dump(streets, f)
+
+end_time = time.time()
+time_difference = (end_time - start_time) / 60
+print("It took {:.2f} minutes to map match coordinates.".format(time_difference))
 
 # --------------
 

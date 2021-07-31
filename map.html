@@ -52,6 +52,8 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     });
 
+    var streetsGroup = L.featureGroup().addTo(map);
+
     // San Francisco
     map.setView(new L.LatLng(37.7749, -122.4194), 13);
 
@@ -113,40 +115,49 @@
         return coordinates;
     };
 
-    // polylines.forEach(function (polyline) {
-    //     var coordinates = decode(polyline);
-    //     var polyline = L.polyline(
-    //         coordinates,
-    //         {
-    //             color: 'blue',
-    //             weight: 1.5,
-    //             lineJoin: 'round'
-    //         }
-    //     ).addTo(map);
-    // });
+    polylines.forEach(function (polyline) {
+        var coordinates = decode(polyline);
+
+        var polyline = L.polyline(
+            coordinates,
+            {
+                color: 'blue',
+                weight: 1.5,
+                lineJoin: 'round'
+            }
+        ).addTo(map);
+    });
 
     var obj;
 
     var ul = document.getElementById('streetsListView');
     ul.onclick = function(event) {
 
-        map.eachLayer(function(layer) {
-            if (!!layer.toGeoJSON) {
-                map.removeLayer(layer);
-            }
-        });
+        streetsGroup.clearLayers();
 
-        var target = event.target;
-        const t = obj[event.target.innerHTML]
-        for (i = 0; i < t.length; i++) {
-            const coordinate = [t[i][1], t[i][2]]
+        const streetName = event.target.innerHTML
+        const nodes = obj[streetName]["nodes"]
+        const progress = obj[streetName]["progress"]
+        for (i = 0; i < nodes.length; i++) {
+            const coordinate = [nodes[i][1], nodes[i][2]]
+
+            var color = '#FF0000'
+            var fillColor = '#FF0000'
+            const visited = nodes[i][3]
+
+            if (visited == 1) {
+                color = '#00FF00'
+                fillColor = '#00FF00'
+            }
 
             var circle = L.circle(coordinate, {
-                color: '#FF0000',
-                fillColor: '#FF0000',
+                color: color,
+                fillColor: fillColor,
                 fillOpacity: 1.0
-            }).addTo(map);
+            }).addTo(streetsGroup);
         }
+
+        alert("Your progress on " + streetName + " is: " + progress + ".")
     };
 
     var request = new XMLHttpRequest();
