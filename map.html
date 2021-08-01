@@ -157,27 +157,27 @@
             }).addTo(streetsGroup);
         }
 
-        alert("Your progress on " + streetName + " is: " + progress + ".")
+        alert("Your progress on " + streetName + " is: " + progress + "%.")
     };
 
-    var streets_request = new XMLHttpRequest();
-    streets_request.open("GET", "http://localhost:8000/streets.json");
-    streets_request.send();
+    fetch("http://localhost:8000/streets.json")
+        .then(function(response) {
+            return response.json();
+        })
+        .then(function(jsonResponse) {
+            streets_obj = jsonResponse
 
-    streets_request.onreadystatechange = (e) => {
-        streets_obj = JSON.parse(streets_request.responseText);
+            for (const [key, value] of Object.entries(jsonResponse)) {
+                var li = document.createElement('li');
+                
+                var a = document.createElement('a');
+                a.innerHTML = key
 
-        for (const [key, value] of Object.entries(streets_obj)) {
-            var li = document.createElement('li');
-            
-            var a = document.createElement('a');
-            a.innerHTML = key
+                li.appendChild(a);
 
-            li.appendChild(a);
-
-            document.getElementById('streetsListView').appendChild(li);
-        }
-    }
+                document.getElementById('streetsListView').appendChild(li);
+            }    
+        });
 
     // photos.forEach(function (photo) {
     //     // L.marker(photo).addTo(map);

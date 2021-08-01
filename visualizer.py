@@ -41,6 +41,8 @@ def load_activities():
     
     f.close()
 
+# load_activities()
+
 def create_file_activities():
     # x - create file
     # w - overwrite file
@@ -57,6 +59,8 @@ def create_file_activities():
 
     activities_file.write("];")
     activities_file.close()
+
+# create_file_activities()
 
 def distance(origin, destination):
     lat1, lon1 = origin
@@ -111,7 +115,8 @@ def coordinates():
     with open('activities.js', 'w') as activities_file:
         activities_file.write("var polylines = [")
 
-        for json_file in glob.glob(os.path.join(folder_path, '3836255196.json')):
+        index = 0
+        for json_file in glob.glob(os.path.join(folder_path, '*.json')):
             with open(json_file, 'r') as source_file:
                 data = json.load(source_file)
                 id = data["id"]
@@ -121,8 +126,10 @@ def coordinates():
                     expected_city = "San Francisco"
 
                     if city != expected_city:
-                        print("Skipping {}, as it's outside of {}.".format(city, expected_city))
+                        print("Skipping {} ({}), as it's outside of {}.".format(city, id, expected_city))
                         continue
+                else:
+                    continue
 
                 polyline_str = ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)
 
@@ -136,12 +143,21 @@ def coordinates():
 
                 print("{} will be used for map matching.".format(id))
                 activity_coordinates.append(current_activity_coordinates)
-                activities_file.write("{},".format(ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)))
+                
+                # Add only first two activities
+                if index < 2:
+                    activities_file.write("{},".format(ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)))
+                
+                index += 1
+                # or add activity to show full list
+                # activities_file.write("{},".format(ujson.dumps(data["map"]["polyline"], escape_forward_slashes=False)))
 
         activities_file.write("];")
         activities_file.close()
 
     return activity_coordinates
+
+# coordinates()
 
 # Get ways and nodes from OpenStreetMap
 def ways_and_nodes():
@@ -164,16 +180,15 @@ def ways_and_nodes():
     return (ways, nodes)
 
 def create_streets():
-    (ways, nodes) = ways_and_nodes()
-
-    # Detect if coordinate from activity is within 25 meters of node
     start_time = time.time()
+
+    (ways, nodes) = ways_and_nodes()
 
     activities = coordinates()
 
     print("Total number of activities, which were started in San Francisco: {}".format(len(activities)))
 
-    for activity_coordinates in activities:
+    for activity_coordinates in activities[0:2]:
         print("Activity contains {} coordinates.".format(len(activity_coordinates)))
 
         index = 0
